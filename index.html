@@ -77,13 +77,28 @@ let fi=(chosen+i)%roster.length;
 return {id:i,team,human,slot,x:0,y:0,vx:0,vy:0,hp:100,face:1,ground:false,stun:0,attack:0,cool:0,special:0,fusion:0,fused:0,alive:true,character:roster[fi],weapon,combo:0,flash:0,fusionData:null,rig:{armL:0,armR:0,legL:0,legR:0,torso:0}};
 }
 function start(){
-mode=$('mode').value;playerSlots=+$('players').value;weapon=$('weapon').value;actors=[];particles=[];matchOver=false;wave=0;survivalKills=0;arenaW=mode==='survival'?Math.max(innerWidth*3.2,2400):innerWidth;arenaH=innerHeight;cameraX=0;
-if(mode==='duo'){actors=[createActor(0,0,true,0),createActor(1,1,playerSlots===1,playerSlots===2?1:0)];if(playerSlots===2)actors[1].human=true}
-if(mode==='teams'){actors=[createActor(0,0,true,0),createActor(1,1,playerSlots>=2,1),createActor(2,0,playerSlots>=3,2),createActor(3,1,playerSlots>=4,3)];}
-if(mode==='free'){actors=[createActor(0,0,true),createActor(1,1,playerSlots===2),createActor(2,2,false),createActor(3,3,false)]}
-if(mode==='survival'){actors=[createActor(0,0,true,0)];actors[0].character=roster[chosen];actors[0].x=arenaW*.12;}
-const w=innerWidth;actors.forEach((a,i)=>{if(mode==='survival'){if(i===0)a.x=arenaW*.12;}else if(mode==='teams'){a.x=a.team===0?w*(.18+(a.slot||0)*.12):w*(.78-(a.slot||0)*.12);}else{a.x=w*(.16+i*.22)}a.y=innerHeight-96;a.face=a.team===0?1:-1});
-$('menu').style.display='none';$('game').style.display='block';$('overlay').style.display='none';$('controls2').style.display=playerSlots===2?'flex':'none';fit();gameOn=true;last=performance.now();requestAnimationFrame(loop);
+mode=$('mode').value;playerSlots=+$('players').value;weapon=$('weapon').value;actors=[];particles=[];matchOver=false;wave=0;survivalKills=0;
+if(mode==='duo'&&playerSlots>2){alert('1 vs 1 supports up to 2 local players. Choose Teams or Free-for-all for 3–4 players.');return}
+if(mode==='survival'&&playerSlots>1){alert('Survival currently supports one local player.');return}
+arenaW=mode==='survival'?Math.max(innerWidth*3.2,2400):innerWidth;arenaH=innerHeight;cameraX=0;
+if(mode==='duo'){
+actors=[createActor(0,0,true,0),createActor(1,1,playerSlots>=2,1)];
+}
+if(mode==='teams'){
+const slots=[0,1,2,3],teams=[0,1,0,1];
+actors=slots.map((slot,i)=>createActor(i,teams[i],slot<playerSlots,slot));
+}
+if(mode==='free'){
+actors=Array.from({length:4},(_,i)=>createActor(i,i,i<playerSlots,i));
+}
+if(mode==='survival'){actors=[createActor(0,0,true,0)];actors[0].character=roster[chosen];actors[0].x=arenaW*.12;spawnSurvivalWave()}
+const w=innerWidth;
+actors.forEach((a,i)=>{if(mode==='survival'){if(i===0)a.x=arenaW*.12}else if(mode==='teams'){a.x=a.team===0?w*(.18+(a.slot===2?.12:0)):w*(.78-(a.slot===3?.12:0))}else{a.x=w*(.12+i*.25)}a.y=innerHeight-96;a.face=a.team===0?1:-1});
+$('menu').style.display='none';$('game').style.display='block';$('overlay').style.display='none';
+$('controls2').style.display=playerSlots>=2?'flex':'none';
+document.querySelectorAll('.player-controls[data-dynamic]').forEach(n=>n.remove());
+for(let p=3;p<=playerSlots;p++){let node=document.createElement('div');node.className='player-controls';node.dataset.dynamic='1';node.innerHTML='<div class="control-actions"><button data-player-act="'+p+'" data-act="jump">P'+p+' JUMP</button><button data-player-act="'+p+'" data-act="attack">ATTACK</button><button data-player-act="'+p+'" data-act="special">SPECIAL</button><button data-player-act="'+p+'" data-act="fuse">FUSE</button></div>';node.style.cssText='position:absolute;top:75px;'+(p===3?'left:8px':'right:8px')+';pointer-events:auto;display:'+(playerSlots>=p?'flex':'none');$('mobile').appendChild(node);node.querySelectorAll('button').forEach(b=>{const pp=b.dataset.playerAct,act=b.dataset.act; b.addEventListener('pointerdown',e=>{e.preventDefault();setInput(pp,act,true)});['pointerup','pointercancel','lostpointercapture'].forEach(ev=>b.addEventListener(ev,()=>setInput(pp,act,false)))})}
+fit();gameOn=true;last=performance.now();requestAnimationFrame(loop);
 }
 $('start').onclick=start;$('rematch').onclick=start;$('back').onclick=menu;$('pause').onclick=menu;
 function menu(){gameOn=false;$('game').style.display='none';$('menu').style.display='grid';$('overlay').style.display='none';held={}}
@@ -110,7 +125,9 @@ if(!a.human){ai(a);return}
 const p=a.slot+1,joyX=Number(held['p'+p+'_joyX']||0),joyY=Number(held['p'+p+'_joyY']||0);
 let left,right,jump,attack,special,fuse;
 if(p===1){left=held.a||joyX<-.22;right=held.d||joyX>.22;jump=held.w||held['p1_jump']||joyY<-.65;attack=held.f||held['p1_attack'];special=held.g||held['p1_special'];fuse=held.e||held['p1_fuse']}
-else{left=held.arrowleft||joyX<-.22;right=held.arrowright||joyX>.22;jump=held.arrowup||held['p2_jump']||joyY<-.65;attack=held['/']||held['p2_attack'];special=held['.']||held['p2_special'];fuse=held.enter||held['p2_fuse']}
+else if(p===2){left=held.arrowleft||joyX<-.22;right=held.arrowright||joyX>.22;jump=held.arrowup||held['p2_jump']||joyY<-.65;attack=held['/']||held['p2_attack'];special=held['.']||held['p2_special'];fuse=held.enter||held['p2_fuse']}
+else if(p===3){left=held.j||joyX<-.22;right=held.l||joyX>.22;jump=held.i||held['p3_jump']||joyY<-.65;attack=held.u||held['p3_attack'];special=held.o||held['p3_special'];fuse=held.p||held['p3_fuse']}
+else{left=held['4']||joyX<-.22;right=held['6']||joyX>.22;jump=held['8']||held['p4_jump']||joyY<-.65;attack=held['1']||held['p4_attack'];special=held['2']||held['p4_special'];fuse=held['3']||held['p4_fuse']}
 a.vx=(right?3.7:0)-(left?3.7:0);if(a.vx)a.face=Math.sign(a.vx);
 if(jump&&a.ground){a.vy=-10.5;a.ground=false}
 if(attack&&!a.attack&&!a.cool){a.attack=weapon==='staff'?24:18;a.cool=weapon==='blaster'?30:20}
@@ -138,7 +155,8 @@ function enemy(a,b){return a!==b&&b.alive&&(mode==='free'||a.team!==b.team)}
 function doFuse(a){
 if(a.fused||a.fusionLock)return;
 let group=a.fusionData?.members||[a];
-let nearby=actors.filter(b=>b!==a&&b.alive&&b.team===a.team&&!b.fused&&Math.abs(b.x-a.x)<155&&Math.abs(b.y-a.y)<110);
+// Fusion is strictly cooperative: never absorb enemies or opponents.
+let nearby=actors.filter(b=>b!==a&&b.alive&&b.team===a.team&&!b.fused&&!b.fusionData&&Math.abs(b.x-a.x)<155&&Math.abs(b.y-a.y)<110);
 let added=nearby.slice(0,Math.max(0,4-group.length));
 if(!added.length){a.fusionLock=18;return}
 const members=[...group,...added],colors=members.map(m=>m.character.color),names=members.map(m=>m.character.name);
