@@ -38,7 +38,7 @@ h1{margin:0;text-align:center;font-size:clamp(34px,8vw,64px);letter-spacing:4px;
 <h1>FUSION DUEL</h1><p id="subtitle">Choose a fighter. Fight together. Fuse into something stronger.</p>
 <div id="roster"></div>
 <div class="settings">
-<label>Battle <select id="mode"><option value="duo">1 vs 1</option><option value="teams">2 vs 2</option><option value="free">Free-for-all</option></select></label>
+<label>Battle <select id="mode"><option value="duo">1 vs 1</option><option value="teams">2 vs 2</option><option value="free">Free-for-all</option><option value="survival">Survival</option></select></label>
 <label>Players <select id="players"><option value="1">1 player</option><option value="2">2 players</option></select></label>
 <label>Weapon <select id="weapon"><option value="sword">Sword</option><option value="staff">Staff</option><option value="blaster">Blaster</option></select></label>
 </div>
@@ -51,7 +51,7 @@ h1{margin:0;text-align:center;font-size:clamp(34px,8vw,64px);letter-spacing:4px;
 <div class="hudside"><div class="hudname" id="leftname">PLAYER</div><div class="bar"><div id="leftbar"></div></div></div>
 <div class="hudside right"><div class="hudname" id="rightname">OPPONENT</div><div class="bar"><div id="rightbar"></div></div></div>
 </div>
-<div id="centerhud">FUSION DUEL</div><button id="pause">MENU</button>
+<div id="centerhud">FUSION DUEL<br><small id="wavehud"></small></div><button id="pause">MENU</button>
 <div id="mobile">
 <div class="player-controls p1" id="controls1"><div class="joy-wrap" data-player="1"><div class="joy-base"></div><div class="joy-stick"></div></div><div class="control-actions"><button data-player-act="1" data-act="jump">JUMP</button><button data-player-act="1" data-act="attack">ATTACK</button><button data-player-act="1" data-act="special">SPECIAL</button><button data-player-act="1" data-act="fuse">FUSE</button></div></div>
 <div class="player-controls p2" id="controls2" style="display:none"><div class="joy-wrap" data-player="2"><div class="joy-base"></div><div class="joy-stick"></div></div><div class="control-actions"><button data-player-act="2" data-act="jump">JUMP</button><button data-player-act="2" data-act="attack">ATTACK</button><button data-player-act="2" data-act="special">SPECIAL</button><button data-player-act="2" data-act="fuse">FUSE</button></div></div>
@@ -66,7 +66,7 @@ const roster=[
 {name:'Rift',color:'#bd8cff',skill:'Blink strike',weapon:'sword'},
 {name:'Circuit',color:'#9ce56d',skill:'Arc shot',weapon:'blaster'}
 ];
-let chosen=0,actors=[],particles=[],held={},gameOn=false,last=0,mode='duo',playerSlots=1,weapon='sword',shake=0,matchOver=false;
+let chosen=0,actors=[],particles=[],held={},gameOn=false,last=0,mode='duo',playerSlots=1,weapon='sword',shake=0,matchOver=false;\nlet arenaW=0,arenaH=0,cameraX=0,wave=0,survivalKills=0;
 function fighterSVG(c){return '<svg viewBox="0 0 80 100"><circle cx="40" cy="17" r="12" fill="'+c+'"/><path d="M40 30 L40 62 M40 38 L18 53 M40 38 L62 53 M40 62 L24 88 M40 62 L56 88" stroke="'+c+'" stroke-width="8" stroke-linecap="round" fill="none"/></svg>'}
 roster.forEach((f,i)=>{let d=document.createElement('div');d.className='card'+(i===chosen?' selected':'');d.innerHTML='<div class="preview">'+fighterSVG(f.color)+'</div><b>'+f.name+'</b><small>'+f.skill+'</small>';d.onclick=()=>{chosen=i;document.querySelectorAll('.card').forEach((x,j)=>x.classList.toggle('selected',j===i))};$('roster').appendChild(d)});
 function fit(){let r=canvas.getBoundingClientRect();canvas.width=Math.floor(r.width*devicePixelRatio);canvas.height=Math.floor(r.height*devicePixelRatio);ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0)}
@@ -76,7 +76,7 @@ let fi=(chosen+i)%roster.length;
 return {id:i,team,human,slot,x:0,y:0,vx:0,vy:0,hp:100,face:1,ground:false,stun:0,attack:0,cool:0,special:0,fusion:0,fused:0,alive:true,character:roster[fi],weapon,combo:0,flash:0,fusionData:null,rig:{armL:0,armR:0,legL:0,legR:0,torso:0}};
 }
 function start(){
-mode=$('mode').value;playerSlots=+$('players').value;weapon=$('weapon').value;actors=[];particles=[];matchOver=false;
+mode=$('mode').value;playerSlots=+$('players').value;weapon=$('weapon').value;actors=[];particles=[];matchOver=false;wave=0;survivalKills=0;arenaW=mode==='survival'?Math.max(innerWidth*3.2,2400):innerWidth;arenaH=innerHeight;cameraX=0;
 if(mode==='duo'){actors=[createActor(0,0,true,0),createActor(1,1,playerSlots===1,playerSlots===2?1:0)];if(playerSlots===2)actors[1].human=true}
 if(mode==='teams'){actors=[createActor(0,0,true,0),createActor(1,1,false,0),createActor(2,0,playerSlots===2,1),createActor(3,1,false,0)];}
 if(mode==='free'){actors=[createActor(0,0,true),createActor(1,1,playerSlots===2),createActor(2,2,false),createActor(3,3,false)]}
@@ -84,7 +84,7 @@ const w=innerWidth;actors.forEach((a,i)=>{a.x=w*(.16+i*.22);a.y=innerHeight*.65;
 $('menu').style.display='none';$('game').style.display='block';$('overlay').style.display='none';$('controls2').style.display=playerSlots===2?'flex':'none';fit();gameOn=true;last=performance.now();requestAnimationFrame(loop);
 }
 $('start').onclick=start;$('rematch').onclick=start;$('back').onclick=menu;$('pause').onclick=menu;
-function menu(){gameOn=false;$('game').style.display='none';$('menu').style.display='grid';$('overlay').style.display='none';held={}}
+function menu(){gameOn=false;$('game').style.display='none';$('menu').style.display='grid';$('overlay').style.display='none';held={}}\nfunction spawnSurvivalWave(){wave++;let count=Math.min(3+wave,10),player=actors.find(x=>x.team===0);for(let i=0;i<count;i++){let a=createActor(actors.length,1,false,0);a.character=roster[(chosen+1+i+wave)%roster.length];a.weapon=a.character.weapon;a.hp=70+wave*8;a.x=Math.min(arenaW-120,(player?.x||arenaW*.12)+innerWidth*(.8+i*.16));a.y=innerHeight*.65;a.face=-1;actors.push(a)}$('wavehud').textContent='WAVE '+wave+' · KOs '+survivalKills}
 function setInput(player,action,value){held['p'+player+'_'+action]=value}
 document.querySelectorAll('[data-player-act]').forEach(b=>{
 const p=b.dataset.playerAct,action=b.dataset.act;
@@ -147,16 +147,16 @@ burst({x:(a.x+ally.x)/2,y:Math.min(a.y,ally.y)-40},'#f3e5ff',55);
 a.fusionLock=60;
 }
 
-function damage(from,to,n){if(to.stun>0)return;to.hp=Math.max(0,to.hp-n);to.stun=14;to.flash=10;to.vx=from.face*5;to.vy=-3.5;shake=5;if(to.hp===0)to.alive=false;burst(to,'#fff',8)}
+function damage(from,to,n){if(to.stun>0)return;to.hp=Math.max(0,to.hp-n);to.stun=14;to.flash=10;to.vx=from.face*5;to.vy=-3.5;shake=5;if(to.hp===0){to.alive=false;if(mode==='survival'&&to.team!==0)survivalKills++}burst(to,'#fff',8)}
 function burst(a,color,count){for(let i=0;i<count;i++)particles.push({x:a.x,y:a.y-35,vx:(Math.random()-.5)*8,vy:(Math.random()-.5)*8,life:25,color,size:3+Math.random()*4})}
 function update(dt){
-const floor=innerHeight-80;
+const floor=arenaH-80;
 actors.forEach(a=>{
 if(!a.alive)return;
 if(a.stun>0){a.stun-=dt;a.vx*=.92}else controls(a);
 a.x+=a.vx*dt;a.y+=a.vy*dt;a.vy+=.55*dt;
 if(a.y>floor-90){a.y=floor-90;a.vy=0;a.ground=true}else a.ground=false;
-a.x=Math.max(24,Math.min(innerWidth-24,a.x));a.vx*=.84;
+a.x=Math.max(24,Math.min(arenaW-24,a.x));a.vx*=.84;
 
 // Spring-driven skeletal pose: limbs smoothly follow movement, jumping and attacks.
 const rig=a.rig, run=Math.max(-1,Math.min(1,a.vx/4));
@@ -210,8 +210,8 @@ ctx.restore();ctx.fillStyle='#fff';ctx.font='bold 12px system-ui';ctx.textAlign=
 function draw(){
 let w=innerWidth,h=innerHeight;ctx.clearRect(0,0,w,h);
 let grad=ctx.createLinearGradient(0,0,0,h);grad.addColorStop(0,'#171b2c');grad.addColorStop(1,'#34314b');ctx.fillStyle=grad;ctx.fillRect(0,0,w,h);
-ctx.fillStyle='#242638';ctx.fillRect(0,h-80,w,80);ctx.strokeStyle='#77758e';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,h-80);ctx.lineTo(w,h-80);ctx.stroke();
-ctx.globalAlpha=.13;ctx.strokeStyle='#c9c2ff';for(let x=0;x<w;x+=70){ctx.beginPath();ctx.moveTo(x,h-80);ctx.lineTo(x+35,h);ctx.stroke()}ctx.globalAlpha=1;
+ctx.save();ctx.translate(-cameraX,0);ctx.fillStyle='#242638';ctx.fillRect(0,h-80,arenaW||w,80);ctx.strokeStyle='#77758e';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,h-80);ctx.lineTo(w,h-80);ctx.stroke();
+ctx.globalAlpha=.13;ctx.strokeStyle='#c9c2ff';for(let x=0;x<(arenaW||w);x+=70){ctx.beginPath();ctx.moveTo(x,h-80);ctx.lineTo(x+35,h);ctx.stroke()}ctx.globalAlpha=1;
 particles.forEach(p=>{ctx.globalAlpha=Math.min(1,p.life/20);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.size||4,0,Math.PI*2);ctx.fill()});ctx.globalAlpha=1;
 actors.forEach(a=>a.alive&&drawActor(a));
 }
