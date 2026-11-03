@@ -40,6 +40,7 @@ h1{margin:0;text-align:center;font-size:clamp(34px,8vw,64px);letter-spacing:4px;
 <div class="settings">
 <label>Battle <select id="mode"><option value="duo">1 vs 1</option><option value="teams">2 vs 2</option><option value="free">Free-for-all</option><option value="survival">Survival</option></select></label>
 <label>Players <select id="players"><option value="1">1 player</option><option value="2">2 players</option><option value="3">3 players</option><option value="4">4 players</option></select></label>
+<label>Stage <select id="stage"><option value="city">Neon City</option><option value="temple">Sky Temple</option><option value="ruins">Overgrown Ruins</option></select></label>
 <label>Weapon <select id="weapon"><option value="sword">Sword</option><option value="staff">Staff</option><option value="blaster">Blaster</option></select></label>
 </div>
 <button id="start">START BATTLE</button>
@@ -67,7 +68,7 @@ const roster=[
 {name:'Circuit',color:'#9ce56d',skill:'Arc shot',weapon:'blaster'}
 ];
 let chosen=0,actors=[],particles=[],held={},gameOn=false,last=0,mode='duo',playerSlots=1,weapon='sword',shake=0,matchOver=false;
-let arenaW=0,arenaH=0,cameraX=0,wave=0,survivalKills=0;
+let arenaW=0,arenaH=0,cameraX=0,wave=0,survivalKills=0,stage='city';
 function fighterSVG(c){return '<svg viewBox="0 0 80 100"><circle cx="40" cy="17" r="12" fill="'+c+'"/><path d="M40 30 L40 62 M40 38 L18 53 M40 38 L62 53 M40 62 L24 88 M40 62 L56 88" stroke="'+c+'" stroke-width="8" stroke-linecap="round" fill="none"/></svg>'}
 roster.forEach((f,i)=>{let d=document.createElement('div');d.className='card'+(i===chosen?' selected':'');d.innerHTML='<div class="preview">'+fighterSVG(f.color)+'</div><b>'+f.name+'</b><small>'+f.skill+'</small>';d.onclick=()=>{chosen=i;document.querySelectorAll('.card').forEach((x,j)=>x.classList.toggle('selected',j===i))};$('roster').appendChild(d)});
 function fit(){let r=canvas.getBoundingClientRect();canvas.width=Math.floor(r.width*devicePixelRatio);canvas.height=Math.floor(r.height*devicePixelRatio);ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0)}
@@ -77,7 +78,7 @@ let fi=(chosen+i)%roster.length;
 return {id:i,team,human,slot,x:0,y:0,vx:0,vy:0,hp:100,face:1,ground:false,stun:0,attack:0,cool:0,special:0,fusion:0,fused:0,alive:true,character:roster[fi],weapon,combo:0,flash:0,fusionData:null,rig:{armL:0,armR:0,legL:0,legR:0,torso:0}};
 }
 function start(){
-mode=$('mode').value;playerSlots=+$('players').value;weapon=$('weapon').value;actors=[];particles=[];matchOver=false;wave=0;survivalKills=0;
+mode=$('mode').value;playerSlots=+$('players').value;weapon=$('weapon').value;stage=$('stage').value;actors=[];particles=[];matchOver=false;wave=0;survivalKills=0;
 if(mode==='duo'&&playerSlots>2){alert('1 vs 1 supports up to 2 local players. Choose Teams or Free-for-all for 3–4 players.');return}
 if(mode==='survival'&&playerSlots>1){alert('Survival currently supports one local player.');return}
 arenaW=mode==='survival'?Math.max(innerWidth*3.2,2400):innerWidth;arenaH=innerHeight;cameraX=0;
@@ -232,9 +233,25 @@ ctx.restore();ctx.fillStyle='#fff';ctx.font='bold 12px system-ui';ctx.textAlign=
 function draw(){
 let w=innerWidth,h=innerHeight;ctx.clearRect(0,0,w,h);
 let focus=actors.find(a=>a.human&&a.alive)||actors[0];if(mode==='survival'&&focus)cameraX=Math.max(0,Math.min(arenaW-w,focus.x-w*.38));else cameraX=0;
-let grad=ctx.createLinearGradient(0,0,0,h);grad.addColorStop(0,'#171b2c');grad.addColorStop(1,'#34314b');ctx.fillStyle=grad;ctx.fillRect(0,0,w,h);
-ctx.save();ctx.translate(-cameraX,0);ctx.fillStyle='#242638';ctx.fillRect(0,h-80,arenaW||w,80);ctx.strokeStyle='#77758e';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,h-80);ctx.lineTo(arenaW||w,h-80);ctx.stroke();
-ctx.globalAlpha=.13;ctx.strokeStyle='#c9c2ff';for(let x=0;x<(arenaW||w);x+=70){ctx.beginPath();ctx.moveTo(x,h-80);ctx.lineTo(x+35,h);ctx.stroke()}ctx.globalAlpha=1;
+// Layered stage art: each map has its own palette, silhouettes, lighting and platform layout.
+let sky=stage==='city'?['#101b39','#5b285f']:stage==='temple'?['#183d5a','#8a9dc2']:['#17372f','#637b4e'];
+let grad=ctx.createLinearGradient(0,0,0,h);grad.addColorStop(0,sky[0]);grad.addColorStop(1,sky[1]);ctx.fillStyle=grad;ctx.fillRect(0,0,w,h);
+ctx.save();ctx.translate(-cameraX*.22,0);
+if(stage==='city'){
+ for(let i=0;i<24;i++){let x=i*145-25,bh=100+(i*73%230);ctx.fillStyle=i%2?'#182642':'#20203c';ctx.fillRect(x,h-80-bh,100,bh);ctx.fillStyle='#f5b84d55';for(let yy=h-bh-65;yy<h-100;yy+=25)for(let xx=x+14;xx<x+85;xx+=24)ctx.fillRect(xx,yy,8,12)}
+}else if(stage==='temple'){
+ for(let i=0;i<9;i++){let x=i*310;ctx.fillStyle='#344b69';ctx.fillRect(x,h-300,46,220);ctx.fillRect(x-18,h-310,82,18);ctx.fillStyle='#c5d8f455';ctx.beginPath();ctx.moveTo(x-10,h-300);ctx.lineTo(x+23,h-390);ctx.lineTo(x+56,h-300);ctx.fill()}
+}else{
+ for(let i=0;i<14;i++){let x=i*210;ctx.fillStyle='#244d3b';ctx.fillRect(x,h-170,30,110);ctx.beginPath();ctx.arc(x+15,h-190,65,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#8eaa6b';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(x+15,h-260);ctx.lineTo(x+60,h-140);ctx.stroke()}
+}
+ctx.restore();
+ctx.save();ctx.translate(-cameraX,0);
+const floorY=h-80;ctx.fillStyle=stage==='city'?'#171b2a':stage==='temple'?'#596779':'#273c2c';ctx.fillRect(0,floorY,arenaW||w,80);
+ctx.fillStyle=stage==='city'?'#38435c':stage==='temple'?'#b2c3d6':'#60764b';ctx.fillRect(0,floorY,arenaW||w,5);
+ctx.strokeStyle='#ffffff18';ctx.lineWidth=2;for(let x=0;x<(arenaW||w);x+=100){ctx.beginPath();ctx.moveTo(x,floorY+8);ctx.lineTo(x+50,floorY+80);ctx.stroke()}
+ // Platforms are solid-looking stage features (combat remains on the main floor).
+ for(let i=0;i<5;i++){let px=220+i*390,py=floorY-125-(i%2)*45;ctx.fillStyle=stage==='city'?'#394b69':stage==='temple'?'#b3c7db':'#536b43';ctx.fillRect(px,py,150,14);ctx.fillStyle='#ffffff35';ctx.fillRect(px,py,150,3)}
+ctx.strokeStyle='#77758e';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,floorY);ctx.lineTo(arenaW||w,floorY);ctx.stroke();
 particles.forEach(p=>{ctx.globalAlpha=Math.min(1,p.life/20);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.size||4,0,Math.PI*2);ctx.fill()});ctx.globalAlpha=1;
 actors.forEach(a=>a.alive&&drawActor(a));ctx.restore();
 }
