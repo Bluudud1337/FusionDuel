@@ -104,12 +104,10 @@ addEventListener('keydown',e=>{held[e.key.toLowerCase()]=true;if(['ArrowLeft','A
 addEventListener('keyup',e=>held[e.key.toLowerCase()]=false);
 function controls(a){
 if(!a.human){ai(a);return}
-let left=a.slot===0?(held.a||held.left):(held.arrowleft||held.j);
-let right=a.slot===0?(held.d||held.right):(held.arrowright||held.l);
-let jump=a.slot===0?(held.w||held.jump):(held.arrowup||held.i);
-let attack=a.slot===0?(held.f||held.attack):(held['/']||held.attack2);
-let special=a.slot===0?(held.g||held.special):(held['.']||held.special2);
-let fuse=a.slot===0?(held.e||held.fuse):(held.enter||held.fuse2);
+const p=a.slot+1,joyX=Number(held['p'+p+'_joyX']||0),joyY=Number(held['p'+p+'_joyY']||0);
+let left,right,jump,attack,special,fuse;
+if(p===1){left=held.a||joyX<-.22;right=held.d||joyX>.22;jump=held.w||held['p1_jump']||joyY<-.65;attack=held.f||held['p1_attack'];special=held.g||held['p1_special'];fuse=held.e||held['p1_fuse']}
+else{left=held.arrowleft||joyX<-.22;right=held.arrowright||joyX>.22;jump=held.arrowup||held['p2_jump']||joyY<-.65;attack=held['/']||held['p2_attack'];special=held['.']||held['p2_special'];fuse=held.enter||held['p2_fuse']}
 a.vx=(right?3.7:0)-(left?3.7:0);if(a.vx)a.face=Math.sign(a.vx);
 if(jump&&a.ground){a.vy=-10.5;a.ground=false}
 if(attack&&!a.attack&&!a.cool){a.attack=weapon==='staff'?24:18;a.cool=weapon==='blaster'?30:20}
