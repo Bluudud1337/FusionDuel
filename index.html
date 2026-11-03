@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Fusion Duel</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101018;color:#fff;font-family:Arial,sans-serif;overflow:hidden;touch-action:none}
+button,select{background:#292938;color:white;border:1px solid #55556b;border-radius:9px;padding:10px;font-weight:bold}
+button:active{background:#6655bb}
+#menu{position:absolute;inset:0;background:linear-gradient(135deg,#151522,#292044);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;overflow:auto;padding:20px}
+h1{font-size:clamp(30px,8vw,60px);margin:0;color:#c8b8ff;text-shadow:0 0 20px #795cff}
+#fighters{display:grid;grid-template-columns:repeat(2,minmax(130px,1fr));gap:10px;width:min(500px,95vw)}
+.fighter{padding:12px;border:2px solid #555;border-radius:12px;text-align:center;cursor:pointer;background:#222230}
+.fighter.selected{border-color:#b9a0ff;background:#39304e}
+.fighter .preview{font-size:35px}
+#settings{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+#game{display:none}
+canvas{display:block;width:100vw;height:100dvh;background:#171725}
+#hud{position:absolute;top:8px;left:8px;right:8px;display:flex;justify-content:space-between;pointer-events:none;gap:6px}
+.health{height:13px;background:#444;border:1px solid #aaa;border-radius:10px;overflow:hidden;width:min(35vw,230px)}
+.health div{height:100%;background:#4ce28b}
+#controls{position:absolute;bottom:15px;left:0;right:0;display:flex;justify-content:space-between;padding:0 18px;pointer-events:none}
+.pad,#actions{display:flex;gap:8px;align-items:end;pointer-events:auto}
+#controls button{width:57px;height:57px;border-radius:50%;font-size:17px;opacity:.88;touch-action:none}
+#actions{flex-wrap:wrap;max-width:190px;justify-content:flex-end}
+#actions button{width:65px;height:50px;border-radius:14px;font-size:12px}
+#result{display:none;position:absolute;inset:0;background:#000b;align-items:center;justify-content:center;flex-direction:column;gap:15px}
+#result h2{font-size:40px}
+@media(min-width:800px){#controls{padding:20px 50px}#controls button{width:65px;height:65px}}
+</style>
+</head>
+<body>
+
+<div id="menu">
+<h1>FUSION DUEL</h1>
+<p>Choose your fighter. Build your team. Become the fusion.</p>
+<div id="fighters"></div>
+<div id="settings">
+<label>Mode <select id="mode"><option value="1">1 vs 1</option><option value="2">2 vs 2</option><option value="3">Free for all</option></select></label>
+<label>Player slots <select id="players"><option value="1">1 Player</option><option value="2">2 Players</option></select></label>
+<label>Weapon <select id="weapon"><option value="sword">Sword</option><option value="blaster">Blaster</option><option value="hammer">Hammer</option></select></label>
+</div>
+<button onclick="startGame()" style="font-size:20px;padding:15px 45px">START FIGHT</button>
+<p>Move: joystick / WASD · Attack: A · Jump: J · Fusion: F</p>
+</div>
+
+<div id="game">
+<canvas id="canvas"></canvas>
+<div id="hud">
+<div><b id="name1">Fighter 1</b><div class="health"><div id="hp1"></div></div></div>
+<div style="text-align:right"><b id="name2">Fighter 2</b><div class="health"><div id="hp2"></div></div></div>
+</div>
+<div id="controls">
+<div class="pad">
+<button data-key="left">◀</button>
+<button data-key="right">▶</button>
+<button data-key="jump">↑</button>
+</div>
+<div id="actions">
+<button data-key="attack">ATTACK</button>
+<button data-key="fusion">FUSION</button>
+<button data-key="swap">SWAP</button>
+<button onclick="backToMenu()">MENU</button>
+</div>
+</div>
+</div>
+
+<div id="result">
+<h2 id="resultText">VICTORY!</h2>
+<button onclick="backToMenu()">BACK TO MENU</button>
+<button onclick="startGame()">REMATCH</button>
+</div>
+
+<script>
+const canvas=document.getElementById("canvas"),ctx=canvas.getContext("2d");
+const fighters=[
+{name:"Solar",color:"#ffb52e",power:"Flare Burst",emoji:"☀"},
+{name:"Frost",color:"#55d9ff",power:"Ice Wave",emoji:"❄"},
+{name:"Volt",color:"#c4ff42",power:"Thunder Dash",emoji:"⚡"},
+{name:"Shadow",color:"#c18cff",power:"Void Strike",emoji:"◆"}
+];
+let selected=0,players=[],keys={},running=false,last=0,mode=1,playerCount=1,weapon="sword",particles=[],fusionTimer=0;
+const fighterBox=document.getElementById("fighters");
+fighters.forEach((f,i)=>{
+ const el=document.createElement("div");el.className="fighter"+(i===0?" selected":"");
+ el.innerHTML=`<div class="preview" style="color:${f.color}">${f.emoji}</div><b>${f.name}</b><br><small>${f.power}</small>`;
+ el.onclick=()=>{selected=i;document.querySelectorAll(".fighter").forEach((x,j)=>x.classList.toggle("selected",j===i))};
+ fighterBox.appendChild(el);
+});
+function resize(){canvas.width=innerWidth*devicePixelRatio;canvas.height=innerHeight*devicePixelRatio;ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0)}
+onresize=resize;resize();
+
+function makePlayer(i,team,bot=false){
+ let fi=(selected+i)%fighters.length;
+ return {x:120+i*90,y:100,vx:0,vy:0,hp:100,team,bot,face:1,f: fighters[fi],weapon,attack:0,fusion:0,ground:false,active:true};
+}
+function startGame(){
+ mode=+document.getElementById("mode").value;
+ playerCount=+document.getElementById("players").value;
+ weapon=document.getElementById("weapon").value;
+ players=[];
+ if(mode===1){
+  players.push(makePlayer(0,0,false));
+  players.push(makePlayer(1,1,playerCount===1));
+ }else if(mode===2){
+  players.push(makePlayer(0,0,false),makePlayer(1,1,playerCount===1),makePlayer(2,0,true),makePlayer(3,1,true));
+ }else{
+  for(let i=0;i<4;i++)players.push(makePlayer(i,i,i>0||playerCount===1));
+ }
+ if(playerCount===2&&mode!==3)players[1].bot=false;
+ document.getElementById("menu").style.display="none";
+ document.getElementById("game").style.display="block";
+ document.getElementById("result").style.display="none";
+ running=true;last=performance.now();requestAnimationFrame(loop);
+}
+function backToMenu(){running=false;document.getElementById("game").style.display="none";document.getElementById("result").style.display="none";document.getElementById("menu").style.display="flex"}
+
+document.querySelectorAll("[data-key]").forEach(b=>{
+ const k=b.dataset.key;
+ b.addEventListener("pointerdown",e=>{e.preventDefault();keys[k]=true});
+ ["pointerup","pointerleave","pointercancel"].forEach(ev=>b.addEventListener(ev,()=>keys[k]=false));
+});
+onkeydown=e=>{keys[e.key.toLowerCase()]=true};
+onkeyup=e=>{keys[e.key.toLowerCase()]=false};
+
+function input(p,index){
+ if(p.bot){
+  let target=players.find(x=>x.team!==p.team&&x.active);
+  if(!target)return;
+  p.face=target.x>p.x?1:-1;
+  if(Math.abs(target.x-p.x)>55)p.vx=p.face*2.5;
+  else{p.vx=0;p.attack=12}
+  if(Math.random()<.003)p.fusion=100;
+  return;
+ }
+ let left=keys.left||keys.a||(index===0&&keys.a);
+ let right=keys.right||keys.d;
+ if(index===1){left=keys.j;right=keys.l}
+ p.vx=(right?3:0)-(left?3:0);
+ if(p.vx)p.face=Math.sign(p.vx);
+ if((keys.jump||keys.w||keys[" "])&&p.ground){p.vy=-10;p.ground=false}
+ if(keys.attack||keys.k){if(p.attack<=0)p.attack=18}
+ if(keys.fusion||keys.u){if(p.fusion<=0)p.fusion=100}
+ if(keys.swap||keys.q){p.f= fighters[(fighters.indexOf(p.f)+1)%fighters.length];keys.swap=false;keys.q=false}
+}
+function loop(t){
+ if(!running)return;
+ let dt=Math.min((t-last)/16,2);last=t;
+ update(dt);draw();requestAnimationFrame(loop);
+}
+function update(dt){
+ const floor=innerHeight-110;
+ players.forEach((p,i)=>{
+  if(!p.active)return;
+  input(p,i);
+  p.x+=p.vx*dt;p.y+=p.vy*dt;
+  p.vy+=.55*dt;
+  if(p.y>floor-55){p.y=floor-55;p.vy=0;p.ground=true}
+  p.x=Math.max(20,Math.min(innerWidth-20,p.x));
+  p.attack=Math.max(0,p.attack-dt);
+  p.fusion=Math.max(0,p.fusion-dt);
+  if(p.attack>0&&Math.random()<.15){
+   players.forEach(e=>{
+    if(e===p||!e.active||e.team===p.team&&mode!==3)return;
+    if(Math.abs(e.x-p.x)<75&&Math.abs(e.y-p.y)<70){
+     let damage=weapon==="hammer"?18:weapon==="blaster"?12:15;
+     e.hp-=damage*dt*.12;
+     if(e.hp<=0){e.hp=0;e.active=false}
+    }
+   });
+  }
+  if(p.fusion>=99){
+   p.fusion=0;
+   players.forEach(e=>{
+    if(e!==p&&e.active&&e.team!==p.team&&Math.abs(e.x-p.x)<180){e.hp-=35;e.vx=p.face*8;e.vy=-5}
+   });
+   for(let n=0;n<25;n++)particles.push({x:p.x,y:p.y,color:p.f.color,life:30,vx:(Math.random()-.5)*9,vy:(Math.random()-.5)*9});
+  }
+ });
+ particles.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.life--});
+ particles=particles.filter(p=>p.life>0);
+ updateHud();
+ let alive=players.filter(p=>p.active);
+ let teams=[...new Set(alive.map(p=>p.team))];
+ if(alive.length<=1||teams.length<=1&&mode!==3){
+  running=false;
+  document.getElementById("result").style.display="flex";
+  document.getElementById("resultText").textContent=alive.length?`${alive[0].f.name} WINS!`:"DRAW!";
+ }
+}
+function updateHud(){
+ let p1=players[0],p2=players.find(p=>p.team!==p1.team)||players[1];
+ document.getElementById("name1").textContent=p1.f.name;
+ document.getElementById("name2").textContent=p2?.f.name||"Opponent";
+ document.getElementById("hp1").style.width=p1.hp+"%";
+ document.getElementById("hp2").style.width=(p2?.hp||0)+"%";
+}
+function draw(){
+ ctx.clearRect(0,0,innerWidth,innerHeight);
+ let g=ctx.createLinearGradient(0,0,0,innerHeight);g.addColorStop(0,"#17172b");g.addColorStop(1,"#34304a");ctx.fillStyle=g;ctx.fillRect(0,0,innerWidth,innerHeight);
+ ctx.fillStyle="#656078";ctx.fillRect(0,innerHeight-55,innerWidth,55);
+ ctx.strokeStyle="#aaa";ctx.beginPath();ctx.moveTo(0,innerHeight-55);ctx.lineTo(innerWidth,innerHeight-55);ctx.stroke();
+ particles.forEach(p=>{ctx.globalAlpha=p.life/30;ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,5,5)});ctx.globalAlpha=1;
+ players.forEach(p=>{
+  if(!p.active)return;
+  ctx.save();ctx.translate(p.x,p.y);ctx.scale(p.face,1);
+  ctx.fillStyle=p.f.color;
+  ctx.beginPath();ctx.arc(0,-35,17,0,Math.PI*2);ctx.fill();
+  ctx.lineWidth=7;ctx.strokeStyle=p.f.color;ctx.lineCap="round";
+  ctx.beginPath();ctx.moveTo(0,-17);ctx.lineTo(0,15);ctx.moveTo(0,-5);ctx.lineTo(-18,8);ctx.moveTo(0,15);ctx.lineTo(-13,35);ctx.moveTo(0,15);ctx.lineTo(13,35);ctx.stroke();
+  if(p.attack>0){
+   ctx.strokeStyle=weapon==="blaster"?"#ffef70":"#fff";
+   ctx.lineWidth=5;ctx.beginPath();ctx.arc(25,-5,35,-1.2,1.2);ctx.stroke();
+  }
+  if(p.fusion>0){
+   ctx.shadowColor=p.f.color;ctx.shadowBlur=20;ctx.strokeStyle=p.f.color;ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,-10,45,0,Math.PI*2);ctx.stroke();
+  }
+  ctx.restore();
+  ctx.fillStyle="#fff";ctx.font="12px Arial";ctx.textAlign="center";ctx.fillText(p.bot?"BOT":p.f.name,p.x,p.y-65);
+ });
+}
+</script>
+</body>
+</html>
