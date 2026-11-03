@@ -73,7 +73,7 @@ function fit(){let r=canvas.getBoundingClientRect();canvas.width=Math.floor(r.wi
 addEventListener('resize',fit);fit();
 function createActor(i,team,human,slot=0){
 let fi=(chosen+i)%roster.length;
-return {id:i,team,human,slot,x:0,y:0,vx:0,vy:0,hp:100,face:1,ground:false,stun:0,attack:0,cool:0,special:0,fusion:0,fused:0,alive:true,character:roster[fi],weapon,combo:0,flash:0};
+return {id:i,team,human,slot,x:0,y:0,vx:0,vy:0,hp:100,face:1,ground:false,stun:0,attack:0,cool:0,special:0,fusion:0,fused:0,alive:true,character:roster[fi],weapon,combo:0,flash:0,rig:{armL:0,armR:0,legL:0,legR:0,torso:0}};
 }
 function start(){
 mode=$('mode').value;playerSlots=+$('players').value;weapon=$('weapon').value;actors=[];particles=[];matchOver=false;
@@ -152,6 +152,15 @@ if(a.stun>0){a.stun-=dt;a.vx*=.92}else controls(a);
 a.x+=a.vx*dt;a.y+=a.vy*dt;a.vy+=.55*dt;
 if(a.y>floor-90){a.y=floor-90;a.vy=0;a.ground=true}else a.ground=false;
 a.x=Math.max(24,Math.min(innerWidth-24,a.x));a.vx*=.84;
+
+// Spring-driven skeletal pose: limbs smoothly follow movement, jumping and attacks.
+const rig=a.rig, run=Math.max(-1,Math.min(1,a.vx/4));
+const targetArmL=-run*.65,targetArmR=run*.65+(a.attack>0?-1.5:0);
+const targetLegL=run*.8+(a.ground?0:-.8),targetLegR=-run*.8+(a.ground?0:.8);
+const stiffness=Math.min(1,.22*dt);
+rig.armL+=(targetArmL-rig.armL)*stiffness;rig.armR+=(targetArmR-rig.armR)*stiffness;
+rig.legL+=(targetLegL-rig.legL)*stiffness;rig.legR+=(targetLegR-rig.legR)*stiffness;
+rig.torso+=((a.vy<0?-.12:a.vy>2?.12:0)-rig.torso)*stiffness;
 a.attack=Math.max(0,a.attack-dt);a.cool=Math.max(0,a.cool-dt);a.special=Math.max(0,a.special-dt);a.fusion=Math.max(0,a.fusion-dt);a.flash=Math.max(0,a.flash-dt);
 if(a.attack>0&&a.attack<16&&a.attack>12&&!a.hitDone){a.hitDone=true;let range=weapon==='staff'?105:weapon==='blaster'?260:75;
 actors.forEach(b=>{if(enemy(a,b)&&Math.abs(b.x-a.x)<range&&Math.abs(b.y-a.y)<85&&Math.sign(b.x-a.x)===a.face){if(weapon==='blaster'){b.hp=Math.max(0,b.hp-10);b.stun=8;b.vx=a.face*2;if(!b.hp)b.alive=false;burst({x:b.x,y:b.y},'#ffe58a',7)}else damage(a,b,weapon==='staff'?13:17)}})}
@@ -171,17 +180,26 @@ $('leftbar').style.width=left.hp+'%';$('rightbar').style.width=right.hp+'%';
 $('leftbar').style.background=left.hp<30?'#ff6565':'#65e29b';$('rightbar').style.background=right.hp<30?'#ff6565':'#65e29b';
 }
 function drawActor(a){
-ctx.save();ctx.translate(a.x,a.y);ctx.scale(a.face,1);let c=a.flash?'#fff':a.character.color;
-ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=c;ctx.fillStyle=c;ctx.lineWidth=8;
-ctx.beginPath();ctx.arc(0,-70,14,0,Math.PI*2);ctx.fill();
-ctx.beginPath();ctx.moveTo(0,-55);ctx.lineTo(0,-23);ctx.moveTo(0,-48);ctx.lineTo(-17,-34);ctx.moveTo(0,-48);ctx.lineTo(17,-34);ctx.moveTo(0,-23);ctx.lineTo(-13,0);ctx.moveTo(0,-23);ctx.lineTo(13,0);ctx.stroke();
-// Weapon drawn in hand, with distinct silhouette
+const r=a.rig,c=a.flash?'#fff':a.character.color;
+ctx.save();ctx.translate(a.x,a.y);ctx.scale(a.face,1);ctx.rotate(r.torso);
+ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=c;ctx.fillStyle=c;
+// A simple articulated skeleton: head, spine, shoulders, elbows, hips, knees and feet.
+const head={x:0,y:-75},neck={x:0,y:-59},shoulderL={x:-12,y:-52},shoulderR={x:12,y:-52},hipL={x:-7,y:-24},hipR={x:7,y:-24};
+function joint(x,y){ctx.fillStyle=c;ctx.beginPath();ctx.arc(x,y,4.5,0,Math.PI*2);ctx.fill()}
+function bone(a,b,width=7){ctx.strokeStyle=c;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();joint(a.x,a.y);joint(b.x,b.y)}
+function limb(start,angle,len){return{x:start.x+Math.sin(angle)*len,y:start.y+Math.cos(angle)*len}}
+const elbowL=limb(shoulderL,r.armL,19),handL=limb(elbowL,r.armL-.35,19);
+const elbowR=limb(shoulderR,r.armR,19),handR=limb(elbowR,r.armR-.35,20);
+const kneeL=limb(hipL,r.legL,20),footL=limb(kneeL,r.legL+.25,19);
+const kneeR=limb(hipR,r.legR,20),footR=limb(kneeR,r.legR+.25,19);
+ctx.beginPath();ctx.arc(head.x,head.y,13,0,Math.PI*2);ctx.fill();
+bone(neck,{x:0,y:-25},9);bone(shoulderL,shoulderR,8);bone(shoulderL,elbowL);bone(elbowL,handL);bone(shoulderR,elbowR);bone(elbowR,handR);bone(hipL,hipR,8);bone(hipL,kneeL);bone(kneeL,footL);bone(hipR,kneeR);bone(kneeR,footR);
+// Weapon follows the right hand joint rather than a fixed torso point.
 ctx.strokeStyle=weapon==='blaster'?'#ffd86b':weapon==='staff'?'#c7a6ff':'#e8edf8';ctx.lineWidth=weapon==='staff'?5:4;
-ctx.beginPath();if(weapon==='sword'){ctx.moveTo(18,-34);ctx.lineTo(42,-65);ctx.moveTo(13,-35);ctx.lineTo(24,-28)}else if(weapon==='staff'){ctx.moveTo(20,-45);ctx.lineTo(22,2)}else{ctx.moveTo(18,-34);ctx.lineTo(35,-34);ctx.lineTo(35,-43);ctx.lineTo(45,-43);ctx.lineTo(45,-25);ctx.lineTo(35,-25);ctx.lineTo(35,-34)}ctx.stroke();
-if(a.attack>0){ctx.strokeStyle='#ffffffaa';ctx.lineWidth=4;ctx.beginPath();ctx.arc(25,-40,weapon==='staff'?55:42,-1.25,1.25);ctx.stroke()}
+ctx.beginPath();if(weapon==='sword'){ctx.moveTo(handR.x,handR.y);ctx.lineTo(handR.x+24,handR.y-30)}else if(weapon==='staff'){ctx.moveTo(handR.x-4,handR.y-38);ctx.lineTo(handR.x+4,handR.y+35)}else{ctx.moveTo(handR.x,handR.y);ctx.lineTo(handR.x+22,handR.y);ctx.lineTo(handR.x+22,handR.y-9);ctx.lineTo(handR.x+32,handR.y-9);ctx.lineTo(handR.x+32,handR.y+9);ctx.lineTo(handR.x+22,handR.y+9)}ctx.stroke();
+if(a.attack>0){ctx.strokeStyle='#ffffffaa';ctx.lineWidth=4;ctx.beginPath();ctx.arc(20,-40,weapon==='staff'?55:42,-1.25,1.25);ctx.stroke()}
 if(a.fusion>0){ctx.strokeStyle='#e9d6ff';ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,-40,49,0,Math.PI*2);ctx.stroke()}
-ctx.restore();
-ctx.fillStyle='#fff';ctx.font='bold 12px system-ui';ctx.textAlign='center';ctx.fillText(a.human?'P'+(a.slot+1):'CPU',a.x,a.y-105);
+ctx.restore();ctx.fillStyle='#fff';ctx.font='bold 12px system-ui';ctx.textAlign='center';ctx.fillText(a.human?'P'+(a.slot+1):'CPU',a.x,a.y-105);
 }
 function draw(){
 let w=innerWidth,h=innerHeight;ctx.clearRect(0,0,w,h);
