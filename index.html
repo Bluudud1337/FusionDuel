@@ -39,7 +39,7 @@ h1{margin:0;text-align:center;font-size:clamp(34px,8vw,64px);letter-spacing:4px;
 <div id="roster"></div>
 <div class="settings">
 <label>Battle <select id="mode"><option value="duo">1 vs 1</option><option value="teams">2 vs 2</option><option value="free">Free-for-all</option><option value="survival">Survival</option></select></label>
-<label>Players <select id="players"><option value="1">1 player</option><option value="2">2 players</option></select></label>
+<label>Players <select id="players"><option value="1">1 player</option><option value="2">2 players</option><option value="3">3 players</option><option value="4">4 players</option></select></label>
 <label>Weapon <select id="weapon"><option value="sword">Sword</option><option value="staff">Staff</option><option value="blaster">Blaster</option></select></label>
 </div>
 <button id="start">START BATTLE</button>
@@ -79,15 +79,15 @@ return {id:i,team,human,slot,x:0,y:0,vx:0,vy:0,hp:100,face:1,ground:false,stun:0
 function start(){
 mode=$('mode').value;playerSlots=+$('players').value;weapon=$('weapon').value;actors=[];particles=[];matchOver=false;wave=0;survivalKills=0;arenaW=mode==='survival'?Math.max(innerWidth*3.2,2400):innerWidth;arenaH=innerHeight;cameraX=0;
 if(mode==='duo'){actors=[createActor(0,0,true,0),createActor(1,1,playerSlots===1,playerSlots===2?1:0)];if(playerSlots===2)actors[1].human=true}
-if(mode==='teams'){actors=[createActor(0,0,true,0),createActor(1,1,false,0),createActor(2,0,playerSlots===2,1),createActor(3,1,false,0)];}
+if(mode==='teams'){actors=[createActor(0,0,true,0),createActor(1,1,playerSlots>=2,1),createActor(2,0,playerSlots>=3,2),createActor(3,1,playerSlots>=4,3)];}
 if(mode==='free'){actors=[createActor(0,0,true),createActor(1,1,playerSlots===2),createActor(2,2,false),createActor(3,3,false)]}
-if(mode==='survival'){actors=[createActor(0,0,true,0)];actors[0].character=roster[chosen];actors[0].x=arenaW*.12;spawnSurvivalWave()}
-const w=innerWidth;actors.forEach((a,i)=>{if(mode!=='survival')a.x=w*(.16+i*.22);a.y=innerHeight*.65;a.face=a.x<w/2?1:-1});
+if(mode==='survival'){actors=[createActor(0,0,true,0)];actors[0].character=roster[chosen];actors[0].x=arenaW*.12;}
+const w=innerWidth;actors.forEach((a,i)=>{if(mode==='survival'){if(i===0)a.x=arenaW*.12;}else if(mode==='teams'){a.x=a.team===0?w*(.18+(a.slot||0)*.12):w*(.78-(a.slot||0)*.12);}else{a.x=w*(.16+i*.22)}a.y=innerHeight-96;a.face=a.team===0?1:-1});
 $('menu').style.display='none';$('game').style.display='block';$('overlay').style.display='none';$('controls2').style.display=playerSlots===2?'flex':'none';fit();gameOn=true;last=performance.now();requestAnimationFrame(loop);
 }
 $('start').onclick=start;$('rematch').onclick=start;$('back').onclick=menu;$('pause').onclick=menu;
 function menu(){gameOn=false;$('game').style.display='none';$('menu').style.display='grid';$('overlay').style.display='none';held={}}
-function spawnSurvivalWave(){wave++;let count=Math.min(3+wave,10),player=actors.find(x=>x.team===0);for(let i=0;i<count;i++){let a=createActor(actors.length,1,false,0);a.character=roster[(chosen+1+i+wave)%roster.length];a.weapon=a.character.weapon;a.hp=70+wave*8;a.x=Math.min(arenaW-120,(player?.x||arenaW*.12)+innerWidth*(.8+i*.16));a.y=innerHeight*.65;a.face=-1;actors.push(a)}$('wavehud').textContent='WAVE '+wave+' · KOs '+survivalKills}
+function spawnSurvivalWave(){wave++;let count=Math.min(3+wave,10),player=actors.find(x=>x.team===0);for(let i=0;i<count;i++){let a=createActor(actors.length,1,false,0);a.character=roster[(chosen+1+i+wave)%roster.length];a.weapon=a.character.weapon;a.hp=70+wave*8;a.x=Math.min(arenaW-120,(player?.x||arenaW*.12)+innerWidth*(1.15+i*.12));a.y=innerHeight-96;a.face=-1;actors.push(a)}$('wavehud').textContent='WAVE '+wave+' · KOs '+survivalKills}
 function setInput(player,action,value){held['p'+player+'_'+action]=value}
 document.querySelectorAll('[data-player-act]').forEach(b=>{
 const p=b.dataset.playerAct,action=b.dataset.act;
@@ -137,17 +137,17 @@ else{let b=actors.filter(x=>enemy(a,x)).sort((x,y)=>Math.abs(x.x-a.x)-Math.abs(y
 function enemy(a,b){return a!==b&&b.alive&&(mode==='free'||a.team!==b.team)}
 function doFuse(a){
 if(a.fused||a.fusionLock)return;
-let ally=actors.find(b=>b!==a&&b.alive&&b.team===a.team&&!b.fused&&Math.abs(b.x-a.x)<145&&Math.abs(b.y-a.y)<100);
-if(!ally){a.fusionLock=18;return}
-const first=a.character,second=ally.character;
-a.fusionData={first,second,weaponA:a.weapon||weapon,weaponB:ally.weapon||weapon,hpBonus:ally.hp};
-a.fused=1;a.fusion=99999;a.character={name:first.name+'-'+second.name,color:first.color,skill:first.skill+' + '+second.skill};
-a.weapon=a.fusionData.weaponA;
-a.hp=Math.min(180,a.hp+ally.hp*.65);
-a.vx=(a.vx+ally.vx)*.5;a.vy=Math.min(a.vy,ally.vy)-2;
-ally.alive=false;ally.fused=2;ally.fusion=0;
-burst({x:(a.x+ally.x)/2,y:Math.min(a.y,ally.y)-40},'#f3e5ff',55);
-a.fusionLock=60;
+let group=a.fusionData?.members||[a];
+let nearby=actors.filter(b=>b!==a&&b.alive&&b.team===a.team&&!b.fused&&Math.abs(b.x-a.x)<155&&Math.abs(b.y-a.y)<110);
+let added=nearby.slice(0,Math.max(0,4-group.length));
+if(!added.length){a.fusionLock=18;return}
+const members=[...group,...added],colors=members.map(m=>m.character.color),names=members.map(m=>m.character.name);
+a.fusionData={members,first:members[0].character,second:members[1]?.character,colors,controllers:{move:Math.floor(Math.random()*members.length),arms:members.length>1?1+Math.floor(Math.random()*(members.length-1)):0},weapons:members.map(m=>m.weapon||weapon)};
+a.fused=1;a.fusion=99999;a.character={name:names.join(' + '),color:colors[0],skill:members.map(m=>m.character.skill).join(' + ')};
+a.weapon=a.fusionData.weapons[0];a.hp=Math.min(250,a.hp+added.reduce((sum,m)=>sum+m.hp*.45,0));
+a.vx=members.reduce((sum,m)=>sum+m.vx,0)/members.length;a.vy=Math.min(...members.map(m=>m.vy))-1.5;
+added.forEach(m=>{m.alive=false;m.fused=2;m.fusion=0});
+burst({x:a.x,y:a.y-40},'#f3e5ff',55);a.fusionLock=60;
 }
 
 function damage(from,to,n){if(to.stun>0)return;to.hp=Math.max(0,to.hp-n);to.stun=14;to.flash=10;to.vx=from.face*5;to.vy=-3.5;shake=5;if(to.hp===0){to.alive=false;if(mode==='survival'&&to.team!==0)survivalKills++}burst(to,'#fff',8)}
@@ -158,7 +158,7 @@ actors.forEach(a=>{
 if(!a.alive)return;
 if(a.stun>0){a.stun-=dt;a.vx*=.92}else controls(a);
 a.x+=a.vx*dt;a.y+=a.vy*dt;a.vy+=.55*dt;
-if(a.y>floor-90){a.y=floor-90;a.vy=0;a.ground=true}else a.ground=false;
+if(a.y>floor-16){a.y=floor-16;a.vy=0;a.ground=true}else a.ground=false;
 a.x=Math.max(24,Math.min(arenaW-24,a.x));a.vx*=.84;
 
 // Spring-driven skeletal pose: limbs smoothly follow movement, jumping and attacks.
