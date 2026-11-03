@@ -73,7 +73,7 @@ function fit(){let r=canvas.getBoundingClientRect();canvas.width=Math.floor(r.wi
 addEventListener('resize',fit);fit();
 function createActor(i,team,human,slot=0){
 let fi=(chosen+i)%roster.length;
-return {id:i,team,human,slot,x:0,y:0,vx:0,vy:0,hp:100,face:1,ground:false,stun:0,attack:0,cool:0,special:0,fusion:0,fused:0,alive:true,character:roster[fi],weapon,combo:0,flash:0,rig:{armL:0,armR:0,legL:0,legR:0,torso:0}};
+return {id:i,team,human,slot,x:0,y:0,vx:0,vy:0,hp:100,face:1,ground:false,stun:0,attack:0,cool:0,special:0,fusion:0,fused:0,alive:true,character:roster[fi],weapon,combo:0,flash:0,fusionData:null,rig:{armL:0,armR:0,legL:0,legR:0,torso:0}};
 }
 function start(){
 mode=$('mode').value;playerSlots=+$('players').value;weapon=$('weapon').value;actors=[];particles=[];matchOver=false;
@@ -133,15 +133,20 @@ else{let b=actors.filter(x=>enemy(a,x)).sort((x,y)=>Math.abs(x.x-a.x)-Math.abs(y
 }
 function enemy(a,b){return a!==b&&b.alive&&(mode==='free'||a.team!==b.team)}
 function doFuse(a){
-let ally=actors.find(b=>b!==a&&b.alive&&b.team===a.team&&!b.fused&&Math.abs(b.x-a.x)<115);
-if(!ally){a.fusion=30;return}
-a.fused=ally.fused=1;a.fusion=ally.fusion=150;
-let x=(a.x+ally.x)/2,y=Math.min(a.y,ally.y)-35;
-burst({x,y},'#e8d6ff',35);
-a.hp=Math.min(100,a.hp+15);ally.hp=Math.min(100,ally.hp+15);
-a.character={name:a.character.name+' + '+ally.character.name,color:'#e1caff',skill:'Fusion'};
-a.vx=a.face*4;ally.vx=-a.face*4;
+if(a.fused||a.fusionLock)return;
+let ally=actors.find(b=>b!==a&&b.alive&&b.team===a.team&&!b.fused&&Math.abs(b.x-a.x)<145&&Math.abs(b.y-a.y)<100);
+if(!ally){a.fusionLock=18;return}
+const first=a.character,second=ally.character;
+a.fusionData={first,second,weaponA:a.weapon||weapon,weaponB:ally.weapon||weapon,hpBonus:ally.hp};
+a.fused=1;a.fusion=99999;a.character={name:first.name+'-'+second.name,color:first.color,skill:first.skill+' + '+second.skill};
+a.weapon=a.fusionData.weaponA;
+a.hp=Math.min(180,a.hp+ally.hp*.65);
+a.vx=(a.vx+ally.vx)*.5;a.vy=Math.min(a.vy,ally.vy)-2;
+ally.alive=false;ally.fused=2;ally.fusion=0;
+burst({x:(a.x+ally.x)/2,y:Math.min(a.y,ally.y)-40},'#f3e5ff',55);
+a.fusionLock=60;
 }
+
 function damage(from,to,n){if(to.stun>0)return;to.hp=Math.max(0,to.hp-n);to.stun=14;to.flash=10;to.vx=from.face*5;to.vy=-3.5;shake=5;if(to.hp===0)to.alive=false;burst(to,'#fff',8)}
 function burst(a,color,count){for(let i=0;i<count;i++)particles.push({x:a.x,y:a.y-35,vx:(Math.random()-.5)*8,vy:(Math.random()-.5)*8,life:25,color,size:3+Math.random()*4})}
 function update(dt){
@@ -161,7 +166,7 @@ const stiffness=Math.min(1,.22*dt);
 rig.armL+=(targetArmL-rig.armL)*stiffness;rig.armR+=(targetArmR-rig.armR)*stiffness;
 rig.legL+=(targetLegL-rig.legL)*stiffness;rig.legR+=(targetLegR-rig.legR)*stiffness;
 rig.torso+=((a.vy<0?-.12:a.vy>2?.12:0)-rig.torso)*stiffness;
-a.attack=Math.max(0,a.attack-dt);a.cool=Math.max(0,a.cool-dt);a.special=Math.max(0,a.special-dt);a.fusion=Math.max(0,a.fusion-dt);a.flash=Math.max(0,a.flash-dt);
+a.attack=Math.max(0,a.attack-dt);a.cool=Math.max(0,a.cool-dt);a.special=Math.max(0,a.special-dt);a.fusionLock=Math.max(0,(a.fusionLock||0)-dt);a.flash=Math.max(0,a.flash-dt);
 if(a.attack>0&&a.attack<16&&a.attack>12&&!a.hitDone){a.hitDone=true;let range=weapon==='staff'?105:weapon==='blaster'?260:75;
 actors.forEach(b=>{if(enemy(a,b)&&Math.abs(b.x-a.x)<range&&Math.abs(b.y-a.y)<85&&Math.sign(b.x-a.x)===a.face){if(weapon==='blaster'){b.hp=Math.max(0,b.hp-10);b.stun=8;b.vx=a.face*2;if(!b.hp)b.alive=false;burst({x:b.x,y:b.y},'#ffe58a',7)}else damage(a,b,weapon==='staff'?13:17)}})}
 if(a.attack===0)a.hitDone=false;
