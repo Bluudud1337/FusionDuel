@@ -80,11 +80,13 @@ mode=$('mode').value;playerSlots=+$('players').value;weapon=$('weapon').value;ac
 if(mode==='duo'){actors=[createActor(0,0,true,0),createActor(1,1,playerSlots===1,playerSlots===2?1:0)];if(playerSlots===2)actors[1].human=true}
 if(mode==='teams'){actors=[createActor(0,0,true,0),createActor(1,1,false,0),createActor(2,0,playerSlots===2,1),createActor(3,1,false,0)];}
 if(mode==='free'){actors=[createActor(0,0,true),createActor(1,1,playerSlots===2),createActor(2,2,false),createActor(3,3,false)]}
-const w=innerWidth;actors.forEach((a,i)=>{a.x=w*(.16+i*.22);a.y=innerHeight*.65;a.face=a.x<w/2?1:-1});
+if(mode==='survival'){actors=[createActor(0,0,true,0)];actors[0].character=roster[chosen];actors[0].x=arenaW*.12;spawnSurvivalWave()}
+const w=innerWidth;actors.forEach((a,i)=>{if(mode!=='survival')a.x=w*(.16+i*.22);a.y=innerHeight*.65;a.face=a.x<w/2?1:-1});
 $('menu').style.display='none';$('game').style.display='block';$('overlay').style.display='none';$('controls2').style.display=playerSlots===2?'flex':'none';fit();gameOn=true;last=performance.now();requestAnimationFrame(loop);
 }
 $('start').onclick=start;$('rematch').onclick=start;$('back').onclick=menu;$('pause').onclick=menu;
-function menu(){gameOn=false;$('game').style.display='none';$('menu').style.display='grid';$('overlay').style.display='none';held={}}\nfunction spawnSurvivalWave(){wave++;let count=Math.min(3+wave,10),player=actors.find(x=>x.team===0);for(let i=0;i<count;i++){let a=createActor(actors.length,1,false,0);a.character=roster[(chosen+1+i+wave)%roster.length];a.weapon=a.character.weapon;a.hp=70+wave*8;a.x=Math.min(arenaW-120,(player?.x||arenaW*.12)+innerWidth*(.8+i*.16));a.y=innerHeight*.65;a.face=-1;actors.push(a)}$('wavehud').textContent='WAVE '+wave+' · KOs '+survivalKills}
+function menu(){gameOn=false;$('game').style.display='none';$('menu').style.display='grid';$('overlay').style.display='none';held={}}
+function spawnSurvivalWave(){wave++;let count=Math.min(3+wave,10),player=actors.find(x=>x.team===0);for(let i=0;i<count;i++){let a=createActor(actors.length,1,false,0);a.character=roster[(chosen+1+i+wave)%roster.length];a.weapon=a.character.weapon;a.hp=70+wave*8;a.x=Math.min(arenaW-120,(player?.x||arenaW*.12)+innerWidth*(.8+i*.16));a.y=innerHeight*.65;a.face=-1;actors.push(a)}$('wavehud').textContent='WAVE '+wave+' · KOs '+survivalKills}
 function setInput(player,action,value){held['p'+player+'_'+action]=value}
 document.querySelectorAll('[data-player-act]').forEach(b=>{
 const p=b.dataset.playerAct,action=b.dataset.act;
@@ -174,7 +176,8 @@ if(a.attack===0)a.hitDone=false;
 particles.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;if(p.shot){let b=actors.find(x=>enemy(p.owner,x)&&Math.abs(x.x-p.x)<18&&Math.abs(x.y-p.y)<65);if(b){damage(p.owner,b,12);p.life=0}}});
 particles=particles.filter(p=>p.life>0);
 let living=actors.filter(a=>a.alive),teams=new Set(living.map(a=>a.team));
-if(!matchOver&&(living.length<=1||mode!=='free'&&teams.size<=1)){matchOver=true;gameOn=false;$('overlay').style.display='grid';$('winner').textContent=living.length?living[0].team===0?'BLUE TEAM WINS':'RED TEAM WINS':'DRAW';$('resultinfo').textContent=living.length?living[0].character.name+' survived the battle.':'Everyone was knocked out.'}
+if(mode==='survival'&&!matchOver){let player=actors.find(a=>a.team===0&&a.alive),enemies=actors.filter(a=>a.team!==0&&a.alive);if(!player){matchOver=true;gameOn=false;$('overlay').style.display='grid';$('winner').textContent='SURVIVAL OVER';$('resultinfo').textContent='You reached wave '+wave+' and defeated '+survivalKills+' enemies.'}else if(enemies.length===0){spawnSurvivalWave()}}
+else if(mode!=='survival'&&!matchOver&&(living.length<=1||mode!=='free'&&teams.size<=1)){matchOver=true;gameOn=false;$('overlay').style.display='grid';$('winner').textContent=living.length?living[0].team===0?'BLUE TEAM WINS':'RED TEAM WINS':'DRAW';$('resultinfo').textContent=living.length?living[0].character.name+' survived the battle.':'Everyone was knocked out.'}
 updateHUD();
 }
 function updateHUD(){
@@ -209,11 +212,12 @@ ctx.restore();ctx.fillStyle='#fff';ctx.font='bold 12px system-ui';ctx.textAlign=
 }
 function draw(){
 let w=innerWidth,h=innerHeight;ctx.clearRect(0,0,w,h);
+let focus=actors.find(a=>a.human&&a.alive)||actors[0];if(mode==='survival'&&focus)cameraX=Math.max(0,Math.min(arenaW-w,focus.x-w*.38));else cameraX=0;
 let grad=ctx.createLinearGradient(0,0,0,h);grad.addColorStop(0,'#171b2c');grad.addColorStop(1,'#34314b');ctx.fillStyle=grad;ctx.fillRect(0,0,w,h);
-ctx.save();ctx.translate(-cameraX,0);ctx.fillStyle='#242638';ctx.fillRect(0,h-80,arenaW||w,80);ctx.strokeStyle='#77758e';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,h-80);ctx.lineTo(w,h-80);ctx.stroke();
+ctx.save();ctx.translate(-cameraX,0);ctx.fillStyle='#242638';ctx.fillRect(0,h-80,arenaW||w,80);ctx.strokeStyle='#77758e';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,h-80);ctx.lineTo(arenaW||w,h-80);ctx.stroke();
 ctx.globalAlpha=.13;ctx.strokeStyle='#c9c2ff';for(let x=0;x<(arenaW||w);x+=70){ctx.beginPath();ctx.moveTo(x,h-80);ctx.lineTo(x+35,h);ctx.stroke()}ctx.globalAlpha=1;
 particles.forEach(p=>{ctx.globalAlpha=Math.min(1,p.life/20);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.size||4,0,Math.PI*2);ctx.fill()});ctx.globalAlpha=1;
-actors.forEach(a=>a.alive&&drawActor(a));
+actors.forEach(a=>a.alive&&drawActor(a));ctx.restore();
 }
 function loop(t){if(!gameOn)return;let dt=Math.min(2,(t-last)/16.67||1);last=t;update(dt);draw();requestAnimationFrame(loop)}
 </script>
