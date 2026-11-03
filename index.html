@@ -170,7 +170,7 @@ ctx.beginPath();ctx.arc(0,-70,14,0,Math.PI*2);ctx.fill();
 ctx.beginPath();ctx.moveTo(0,-55);ctx.lineTo(0,-23);ctx.moveTo(0,-48);ctx.lineTo(-17,-34);ctx.moveTo(0,-48);ctx.lineTo(17,-34);ctx.moveTo(0,-23);ctx.lineTo(-13,0);ctx.moveTo(0,-23);ctx.lineTo(13,0);ctx.stroke();
 // Weapon drawn in hand, with distinct silhouette
 ctx.strokeStyle=weapon==='blaster'?'#ffd86b':weapon==='staff'?'#c7a6ff':'#e8edf8';ctx.lineWidth=weapon==='staff'?5:4;
-ctx.beginPath();if(weapon==='sword'){ctx.moveTo(18,-34);ctx.lineTo(42,-65);ctx.moveTo(13,-35);ctx.lineTo(24,-28)}else if(weapon==='staff'){ctx.moveTo(20,-45);ctx.lineTo(22,2)}else{ctx.moveTo(18,-34);ctx.lineTo(35,-34);ctx.lineTo(35,-43);ctx.lineTo(45,-43);ctx.lineTo(45,-25);ctx.lineTo(35,-25);ctx.lineTo(35,-34}ctx.stroke();
+ctx.beginPath();if(weapon==='sword'){ctx.moveTo(18,-34);ctx.lineTo(42,-65);ctx.moveTo(13,-35);ctx.lineTo(24,-28)}else if(weapon==='staff'){ctx.moveTo(20,-45);ctx.lineTo(22,2)}else{ctx.moveTo(18,-34);ctx.lineTo(35,-34);ctx.lineTo(35,-43);ctx.lineTo(45,-43);ctx.lineTo(45,-25);ctx.lineTo(35,-25);ctx.lineTo(35,-34)}ctx.stroke();
 if(a.attack>0){ctx.strokeStyle='#ffffffaa';ctx.lineWidth=4;ctx.beginPath();ctx.arc(25,-40,weapon==='staff'?55:42,-1.25,1.25);ctx.stroke()}
 if(a.fusion>0){ctx.strokeStyle='#e9d6ff';ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,-40,49,0,Math.PI*2);ctx.stroke()}
 ctx.restore();
