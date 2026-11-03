@@ -77,11 +77,11 @@ return {id:i,team,human,slot,x:0,y:0,vx:0,vy:0,hp:100,face:1,ground:false,stun:0
 }
 function start(){
 mode=$('mode').value;playerSlots=+$('players').value;weapon=$('weapon').value;actors=[];particles=[];matchOver=false;
-if(mode==='duo'){actors=[createActor(0,0,true,0),createActor(1,1,playerSlots===1,0)];if(playerSlots===2)actors[1].human=true}
+if(mode==='duo'){actors=[createActor(0,0,true,0),createActor(1,1,playerSlots===1,playerSlots===2?1:0)];if(playerSlots===2)actors[1].human=true}
 if(mode==='teams'){actors=[createActor(0,0,true,0),createActor(1,1,playerSlots===1,0),createActor(2,0,playerSlots===2?true:false,1),createActor(3,1,true,1)];if(playerSlots===1){actors[2].human=false;actors[3].human=false}else{actors[1].human=true;actors[2].human=true;actors[3].human=false}}
 if(mode==='free'){actors=[createActor(0,0,true),createActor(1,1,playerSlots===2),createActor(2,2,false),createActor(3,3,false)]}
 const w=innerWidth;actors.forEach((a,i)=>{a.x=w*(.16+i*.22);a.y=innerHeight*.65;a.face=a.x<w/2?1:-1});
-$('menu').style.display='none';$('game').style.display='block';$('overlay').style.display='none';fit();gameOn=true;last=performance.now();requestAnimationFrame(loop);
+$('menu').style.display='none';$('game').style.display='block';$('overlay').style.display='none';$('controls2').style.display=playerSlots===2?'flex':'none';fit();gameOn=true;last=performance.now();requestAnimationFrame(loop);
 }
 $('start').onclick=start;$('rematch').onclick=start;$('back').onclick=menu;$('pause').onclick=menu;
 function menu(){gameOn=false;$('game').style.display='none';$('menu').style.display='grid';$('overlay').style.display='none';held={}}
