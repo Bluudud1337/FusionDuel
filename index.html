@@ -53,8 +53,8 @@ h1{margin:0;text-align:center;font-size:clamp(34px,8vw,64px);letter-spacing:4px;
 </div>
 <div id="centerhud">FUSION DUEL</div><button id="pause">MENU</button>
 <div id="mobile">
-<div id="movePad"><button data-act="left">◀</button><button data-act="right">▶</button><button data-act="jump">JUMP</button></div>
-<div id="fightPad"><button data-act="attack">ATTACK</button><button data-act="special">SPECIAL</button><button data-act="fuse">FUSE</button></div>
+<div class="player-controls p1" id="controls1"><div class="joy-wrap" data-player="1"><div class="joy-base"></div><div class="joy-stick"></div></div><div class="control-actions"><button data-player-act="1" data-act="jump">JUMP</button><button data-player-act="1" data-act="attack">ATTACK</button><button data-player-act="1" data-act="special">SPECIAL</button><button data-player-act="1" data-act="fuse">FUSE</button></div></div>
+<div class="player-controls p2" id="controls2" style="display:none"><div class="joy-wrap" data-player="2"><div class="joy-base"></div><div class="joy-stick"></div></div><div class="control-actions"><button data-player-act="2" data-act="jump">JUMP</button><button data-player-act="2" data-act="attack">ATTACK</button><button data-player-act="2" data-act="special">SPECIAL</button><button data-player-act="2" data-act="fuse">FUSE</button></div></div>
 </div>
 <div id="overlay"><h2 id="winner">VICTORY</h2><p id="resultinfo"></p><button id="rematch">REMATCH</button><button id="back">CHARACTER SELECT</button></div>
 </section>
@@ -85,11 +85,20 @@ $('menu').style.display='none';$('game').style.display='block';$('overlay').styl
 }
 $('start').onclick=start;$('rematch').onclick=start;$('back').onclick=menu;$('pause').onclick=menu;
 function menu(){gameOn=false;$('game').style.display='none';$('menu').style.display='grid';$('overlay').style.display='none';held={}}
-document.querySelectorAll('[data-act]').forEach(b=>{
-const a=b.dataset.act;
-const down=e=>{e.preventDefault();held[a]=true;b.setPointerCapture?.(e.pointerId)};
-const up=e=>{e.preventDefault();held[a]=false};
+function setInput(player,action,value){held['p'+player+'_'+action]=value}
+document.querySelectorAll('[data-player-act]').forEach(b=>{
+const p=b.dataset.playerAct,action=b.dataset.act;
+const down=e=>{e.preventDefault();setInput(p,action,true);b.setPointerCapture?.(e.pointerId)};
+const up=e=>{e.preventDefault();setInput(p,action,false)};
 b.addEventListener('pointerdown',down);['pointerup','pointercancel','lostpointercapture'].forEach(ev=>b.addEventListener(ev,up));
+});
+document.querySelectorAll('.joy-wrap').forEach(pad=>{
+const player=pad.dataset.player,stick=pad.querySelector('.joy-stick');let active=null;
+function move(e){const r=pad.getBoundingClientRect(),dx0=e.clientX-(r.left+r.width/2),dy0=e.clientY-(r.top+r.height/2),max=r.width*.29,len=Math.hypot(dx0,dy0),scale=len>max?max/len:1,dx=dx0*scale,dy=dy0*scale;stick.style.transform='translate('+dx+'px,'+dy+'px)';setInput(player,'joyX',dx/max);setInput(player,'joyY',dy/max)}
+function reset(){active=null;stick.style.transform='translate(0,0)';setInput(player,'joyX',0);setInput(player,'joyY',0)}
+pad.addEventListener('pointerdown',e=>{e.preventDefault();active=e.pointerId;pad.setPointerCapture(e.pointerId);move(e)});
+pad.addEventListener('pointermove',e=>{if(e.pointerId===active)move(e)});
+['pointerup','pointercancel','lostpointercapture'].forEach(ev=>pad.addEventListener(ev,reset));
 });
 addEventListener('keydown',e=>{held[e.key.toLowerCase()]=true;if(['ArrowLeft','ArrowRight','ArrowUp',' '].includes(e.key))e.preventDefault()});
 addEventListener('keyup',e=>held[e.key.toLowerCase()]=false);
